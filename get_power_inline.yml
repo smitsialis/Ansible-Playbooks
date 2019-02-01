@@ -1,0 +1,29 @@
+---
+- name: Test of show power inline role
+  hosts: "{{ switch_name }}"
+  vars_files:
+     - group_vars/switch
+  gather_facts: no
+  tasks:
+
+    - name: Get show power inline 
+      ios_command:
+        commands: "show power inline"
+      register: result
+
+    - name: import the network-engine role
+      import_role:
+        name: ansible-network.cisco_ios
+
+    - name: Parse the results
+      command_parser:
+        file: "parsers/show_power_inline.yaml"
+        content: "{{ result.stdout.0 }}"
+
+    - name: Show results of parser
+      debug:
+        var: ansible_facts.power_inline
+
+    - name: show poe power per interface
+      debug:
+        var: ansible_facts.poe_interface_stats
