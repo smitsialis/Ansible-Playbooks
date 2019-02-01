@@ -1,0 +1,94 @@
+---
+#
+#  Parses the results from a show power inline xxxx
+#     Uses command_parser from network-engine
+#
+# by: Spiro Mitsialis
+#
+#  Sample Output
+#
+#Module   Available     Used     Remaining
+#          (Watts)     (Watts)    (Watts)
+#------   ---------   --------   ---------
+#1           790.0       92.4       697.6
+#Interface Admin  Oper       Power   Device              Class Max
+#                            (Watts)
+#--------- ------ ---------- ------- ------------------- ----- ----
+#Gi1/0/1   auto   on         15.4    Ieee PD             3     30.0
+#Gi1/0/2   auto   on         15.4    Ieee PD             3     30.0
+#Gi1/0/3   auto   off        0.0     n/a                 n/a   30.0
+#Gi1/0/4   auto   on         15.4    Ieee PD             3     30.0
+#Gi1/0/5   auto   on         15.4    Ieee PD             3     30.0
+#Gi1/0/6   auto   on         15.4    Ieee PD             3     30.0
+#Gi1/0/7   auto   on         15.4    Ieee PD             3     30.0
+#Gi1/0/8   auto   off        0.0     n/a                 n/a   30.0
+#Gi1/0/9   auto   off        0.0     n/a                 n/a   30.0
+#...
+#Module   Available     Used     Remaining
+#          (Watts)     (Watts)    (Watts)
+#------   ---------   --------   ---------
+#2           790.0        0.0       790.0
+#Interface Admin  Oper       Power   Device              Class Max
+#                            (Watts)
+#--------- ------ ---------- ------- ------------------- ----- ----
+#Gi2/0/1   auto   off        0.0     n/a                 n/a   30.0
+#Gi2/0/2   auto   off        0.0     n/a                 n/a   30.0
+#Gi2/0/3   auto   off        0.0     n/a                 n/a   30.0
+#Gi2/0/4   auto   off        0.0     n/a                 n/a   30.0
+#Gi2/0/5   auto   off        0.0     n/a                 n/a   30.0
+#Gi2/0/6   auto   off        0.0     n/a                 n/a   30.0
+#Gi2/0/7   auto   off        0.0     n/a                 n/a   30.0
+
+- name: parser meta data
+  parser_metadata:
+    version: 1.0
+    command: show power inline
+    network_os: ios
+#
+- name: match power by switch module
+  pattern_match:
+    regex: "---\\n(\\d) \\s+(\\d+.\\d+)\\s+(\\d+.\\d+)\\s+(\\d+.\\d+)"
+    match_all: yes
+  register: power_section
+
+- name: match interface PoE power
+  pattern_match:
+    regex: "(Gi\\S+)\\s+(\\w+)\\s+(\\w+)\\s+(\\d+.\\d+)\\s+(\\w+ \\w+|n\\/a)\\s+(\\d+|n\\/a)\\s+(\\d+.\\d+)"
+    match_all: yes
+  register: interface_power
+  export: yes
+
+- name: generate json data structure
+  json_template:
+    template:
+      - key: "{{ item.matches.0 }}"
+        object:
+        - key: module_power_avail
+          value: "{{ item.matches.1 }}"
+        - key: module_power_used
+          value: "{{ item.matches.2 }}"
+        - key: module_power_remaining
+          value: "{{ item.matches.3 }}"
+  loop: "{{ power_section }}"
+  register: power_inline
+  export: yes
+- name: generate jsone data for interface PoE
+  json_template:
+    template:
+       - key: "{{ item.matches.0 }}"
+         object:
+         - key: admin_stauts
+           value: "{{ item.matches.1 }}"
+         - key: oper_status
+           value: "{{ item.matches.2 }}"
+         - key: power_used
+           value: "{{ item.matches.3 }}"
+         - key: device
+           value: "{{ item.matches.4 }}"
+         - key: poe_class
+           value: "{{ item.matches.5 }}"
+         - key: max_power
+           value: "{{ item.matches.6 }}"
+  loop: "{{ interface_power }}"
+  register: poe_interface_stats
+  export: yes
